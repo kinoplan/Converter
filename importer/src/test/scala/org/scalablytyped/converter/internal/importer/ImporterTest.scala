@@ -98,4 +98,7 @@ trait ImporterTest extends AnyFunSuite with ImporterHarness with ParallelTestExe
   test("react-integration-test-japgolly")(
     assertImportsOk("react-integration-test", pedantic = false, flavour = Japgolly),
   )
+
+  // 128 x Double (2 slots each) = 256 > 254 slot limit — verifies slot-aware truncation
+  test("slot-limit-double")(assertImportsOk("slot-limit-double", pedantic = true))
 }
