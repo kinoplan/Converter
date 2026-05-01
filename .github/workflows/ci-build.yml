@@ -1,9 +1,9 @@
 name: CI Build
 on:
   pull_request:
-    branches: [ 'master' ]
+    branches: [ 'develop-kp' ]
   push:
-    branches: [ 'master' ]
+    branches: [ 'develop-kp' ]
 
 jobs:
   scalafmt:
