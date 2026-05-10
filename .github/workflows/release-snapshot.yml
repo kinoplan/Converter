@@ -3,10 +3,12 @@
 # that's why we don't trigger on tag
 name: Release snapshot
 on:
-  workflow_dispatch:
   push:
+    branches:
+      - develop-kp
     tags:
       - 'v*'
+  pull_request:
 
 jobs:
   release-snapshot:
@@ -27,24 +29,3 @@ jobs:
           PGP_SECRET: ${{ secrets.PGP_SECRET }}
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
-          # Custom release command: publish all modules for 2.12, then all except sbt-converter for 3
-          CI_RELEASE: >-
-            ++2.12.20;
-            logging/publishSigned;
-            core/publishSigned;
-            phases/publishSigned;
-            ts/publishSigned;
-            scalajs/publishSigned;
-            importer-portable/publishSigned;
-            sbt-converter/publishSigned;
-            importer/publishSigned;
-            cli/publishSigned;
-            ++3.3.4;
-            logging/publishSigned;
-            core/publishSigned;
-            phases/publishSigned;
-            ts/publishSigned;
-            scalajs/publishSigned;
-            importer-portable/publishSigned;
-            importer/publishSigned;
-            cli/publishSigned

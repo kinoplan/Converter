@@ -1,114 +1,48 @@
 name: CI Build
-on:
-  pull_request:
-    branches: [ 'master' ]
-  push:
-    branches: [ 'master' ]
+on: [push, pull_request]
 
 jobs:
-  scalafmt:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: coursier/setup-action@v1
-        with:
-          apps: scalafmt
-
-      - uses: coursier/cache-action@v6.4
-
-      - name: Scalafmt
-        run: scalafmt -c .scalafmt.conf --check
-
   build:
-    name: CI Build on ${{ matrix.os }} (Scala ${{ matrix.scala }})
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    name: Build and Test
     strategy:
       matrix:
-        include:
-          - os: ubuntu-latest
-            scala: "2.12"
-          - os: ubuntu-latest
-            scala: "3"
-          - os: macos-latest
-            scala: "2.12"
-          - os: macos-latest
-            scala: "3"
-          - os: windows-latest
-            scala: "2.12"
-          - os: windows-latest
-            scala: "3"
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        scala: ["2.12", "3"]
+        platform: ["JVM"]
+    runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Enable long paths (Windows)
+        if: runner.os == 'Windows'
+        run: git config --global core.longpaths true
+
+      - name: Checkout current branch
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - uses: coursier/cache-action@v6.4
+      - name: Cache build
+        uses: coursier/cache-action@v8
 
-      - uses: coursier/setup-action@v1
+      - name: Install coursier
+        uses: coursier/setup-action@v3
         with:
           jvm: adoptium:1.21.0.1
           apps: sbt
+      - uses: sbt/setup-sbt@v1
 
-      - name: Get tests folder sha
-        id: get-tests-folder-sha
-        run: |
-          echo "sha=$(git ls-tree HEAD tests --object-only)" >> $GITHUB_OUTPUT
+      - name: Clean
+        run: sbt $SBT_JAVA_OPTS -v "cleanScoped ${{ matrix.scala }} ${{ matrix.platform }}"
 
-      - uses: actions/cache@v4
-        with:
-          path: test-cache
-          key: ${{ runner.os }}-${{ steps.get-tests-folder-sha.outputs.sha }}-test-cache-v1
+      - name: Compile
+        run: sbt $SBT_JAVA_OPTS -v "compileScoped ${{ matrix.scala }} ${{ matrix.platform }}"
 
-      - name: Build and test
-        run: |
-          if [[ "${{ matrix.scala }}" == "3" ]]; then
-            # For Scala 3, test all modules except sbt-converter (which is SBT 1.x only - Scala 2.12)
-            sbt "++3.3.4" \
-              "logging/test" \
-              "core/test" \
-              "phases/test" \
-              "ts/test" \
-              "scalajs/test" \
-              "importer-portable/test" \
-              "importer/test" \
-              "cli/test"
-          else
-            # For Scala 2.12, test everything
-            sbt "++2.12.20" test
-          fi
-        shell: bash
-        env:
-          CI: true
-          CI_TEST_CACHE: ../test-cache
+      - name: Test
+        run: sbt $SBT_JAVA_OPTS -v "testScoped ${{ matrix.scala }} ${{ matrix.platform }}"
 
-# commented out while I figure out how to speed it up or when to run it
-#  sbt-scripted-tests:
-#    name: Run sbt scripted tests
-#    runs-on: ubuntu-latest
-#    timeout-minutes: 25
-#    steps:
-#      - uses: actions/checkout@v4
-#        with:
-#          fetch-depth: 0
-#
-#      - uses: coursier/cache-action@v6.4
-#
-#      # cache artifacts within same date. should help a bit with the compile time
-#      - name: Get timestamp
-#        id: get-date
-#        run: |
-#          echo "time=$(date +%yy-%m-%d)" >> $GITHUB_OUTPUT
-#
-#      - uses: actions/cache@v4
-#        with:
-#          path: ~/.ivy2/local/org.scalablytyped
-#          key: scripted-v1-${{ steps.get-date.outputs.time }}
-#
-#      - uses: coursier/setup-action@v1
-#        with:
-#          jvm: adoptium:1.21.0.1
-#          apps: sbt
-#
-#      - name: Run scripted
-#        run: sbt scripted
+      - name: Scalafmt check sbt
+        if: matrix.os == 'ubuntu-latest' && matrix.scala == '2.12' && matrix.platform == 'JVM'
+        run: sbt $SBT_JAVA_OPTS -v scalafmtSbtCheck
+
+      - name: Scalafmt check sources
+        if: matrix.os == 'ubuntu-latest'
+        run: sbt $SBT_JAVA_OPTS -v "scalafmtCheckScoped ${{ matrix.scala }} ${{ matrix.platform }}"
