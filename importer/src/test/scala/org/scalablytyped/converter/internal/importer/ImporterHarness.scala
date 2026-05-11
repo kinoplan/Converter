@@ -29,7 +29,7 @@ object Mode {
   val isCi        = sys.env.contains("CI")
   val isRelease   = sys.env.contains("CI_COMMIT_TAG")
   val isLocalhost = !isCi
-  def releaseOnly = RunDontStore //if (isLocalhost || isRelease) RunDontStore else Skip
+  def releaseOnly = if (isLocalhost || isRelease) RunDontStore else Skip
   def normal      = Normal(update = isLocalhost) // update files locally but not in CI
 
   object Skip extends Mode
