@@ -20,6 +20,10 @@ class LibraryResolver(
         file(folder, localPath).map { inFile =>
           ResolvedModule.Local(inFile, LibraryResolver.moduleNameFor(source, inFile).head)
         }
+      case SrcRootPath(srcRelative) =>
+        file(source.folder, "es/" + srcRelative).map { inFile =>
+          ResolvedModule.Local(inFile, LibraryResolver.moduleNameFor(source, inFile).head)
+        }
       case globalRef =>
         val modName = ModuleNameParser(globalRef.split("/").toList, keepIndexFragment = true)
         library(modName.inLibrary) match {
@@ -107,5 +111,9 @@ object LibraryResolver {
 
   private object LocalPath {
     def unapply(s: String): Option[String] = if (s.startsWith(".")) Some(s) else None
+  }
+
+  private object SrcRootPath {
+    def unapply(s: String): Option[String] = if (s.startsWith("src/")) Some(s.drop("src/".length)) else None
   }
 }
