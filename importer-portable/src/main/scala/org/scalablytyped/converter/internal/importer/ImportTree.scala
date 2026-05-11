@@ -705,7 +705,7 @@ class ImportTree(
     }
 
   // Extracts the preserved (pre-inlineTParams) function signature from a TS type, storing it as a
-  // Marker so IdentifyReactComponents can generate generic builders (e.g. List[T], Segmented[T]).
+  // Marker so IdentifyReactComponents can generate generic builders (e.g. List[T], Segmented[T], FormItem[T]).
   def extractInnerFunctionMarker(
       scope:               TsTreeScope,
       tpe:                 TsType,
@@ -731,7 +731,34 @@ class ImportTree(
     tpe match {
       case TsTypeFunction(sig)    => fromSig(sig)
       case TsTypeIntersect(types) => types.firstDefined(t => extractInnerFunctionMarker(scope, t, existingTparamNames))
-      case _                      => None
+      // ResolveTypeQueries converts `typeof Fn<T>` to TsTypeObject with a TsMemberCall when tparams.nonEmpty
+      case TsTypeObject(_, members) =>
+        members.firstDefined {
+          case TsMemberCall(_, _, sig) => fromSig(sig)
+          case _                       => None
+        }
+      case TsTypeQuery(expr) =>
+        // `typeof SomeFunction` — look up the function declaration and use its signature
+        scope.lookup(expr).firstDefined {
+          case f: TsDeclFunction => fromSig(f.signature)
+          case _ => None
+        }
+      case ref: TsTypeRef =>
+        // Follow type aliases (e.g. InternalFormItemType = typeof InternalFormItem).
+        // TypeAliasIntersection may have converted the alias to an interface — handle both.
+        val resolved = ts.FollowAliases(scope)(ref)
+        if (resolved != ref) extractInnerFunctionMarker(scope, resolved, existingTparamNames)
+        else
+          // FollowAliases only follows thin interfaces; for interfaces with members (e.g.
+          // CompoundedComponent after TypeAliasIntersection) we walk the inheritance chain.
+          scope.lookupType(ref.name).firstDefined {
+            case i: TsDeclInterface =>
+              i.inheritance
+                .firstDefined(parent => extractInnerFunctionMarker(scope, parent, existingTparamNames))
+                .orElse(extractInnerFunctionMarker(scope, TsTypeObject(NoComments, i.members), existingTparamNames))
+            case _ => None
+          }
+      case _ => None
     }
   }
 
