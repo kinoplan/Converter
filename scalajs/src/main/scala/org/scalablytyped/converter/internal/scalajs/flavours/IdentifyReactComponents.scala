@@ -348,19 +348,22 @@ class IdentifyReactComponents(
       ),
     )
     def isAliasToFC: Option[Component] = {
-      def fromJsFunction(paramTypes: IArray[TypeRef], ret: TypeRef): Option[Component] = {
-        val params =
-          paramTypes.map(tpe =>
-            ParamTree(Name.dummy, isImplicit = false, isVal = false, tpe, NotImplemented, NoComments),
-          )
+      def buildMethodComponent(
+          tparams:    IArray[TypeParamTree],
+          paramTypes: IArray[TypeRef],
+          retType:    TypeRef,
+      ): Option[Component] = {
+        val params = paramTypes.map(tpe =>
+          ParamTree(Name.dummy, isImplicit = false, isVal = false, tpe, NotImplemented, NoComments),
+        )
         // ReturnType<T> is a TypeScript utility type; treat as Any since we can't resolve it
-        val resultType = if (ret.typeName.parts.last.unescaped === "ReturnType") TypeRef.Any else ret
+        val resultType = if (retType.typeName.parts.last.unescaped === "ReturnType") TypeRef.Any else retType
         maybeMethodComponent(
           MethodTree(
             annotations = field.annotations,
             level       = ProtectionLevel.Public,
             name        = field.name,
-            tparams     = Empty,
+            tparams     = tparams,
             params      = IArray(params),
             impl        = field.impl,
             resultType  = resultType,
@@ -374,14 +377,51 @@ class IdentifyReactComponents(
         )
       }
 
-      FollowAliases(scope)(field.tpe) match {
-        case TypeRef.JsFunction(paramTypes, ret) => fromJsFunction(paramTypes, ret)
-        case TypeRef.Intersection(types, _) =>
-          types.firstDefined {
-            case TypeRef.JsFunction(paramTypes, ret) => fromJsFunction(paramTypes, ret)
-            case _                                   => None
-          }
-        case _ => None
+      // Prefer the preserved (pre-inlineTParams) signature from Marker when available,
+      // so that generic components like List[T] and Segmented[T] keep their type parameter.
+      // The Marker may be on: the field itself (TsDeclVar with inline function) or a referenced TypeAlias.
+      val fromMarker: Option[Component] = {
+        def markerFrom(c: Comments): Option[(IArray[Name], IArray[TypeRef], TypeRef)] =
+          c.extract { case Marker.InnerFunctionTparams(ns, pts, rt) => (ns, pts, rt) }.map(_._1)
+
+        val markerData: Option[(IArray[Name], IArray[TypeRef], TypeRef)] =
+          markerFrom(field.comments).orElse(
+            scope
+              .lookup(field.tpe.typeName)
+              .collectFirst {
+                case (ta: TypeAliasTree, _) => markerFrom(ta.comments)
+              }
+              .flatten,
+          )
+
+        markerData.flatMap {
+          case (names, pts, rt) =>
+            val tparams = names.map(n => TypeParamTree(n, Empty, None, NoComments, ignoreBound = true))
+            buildMethodComponent(tparams, pts, rt)
+        }
+      }
+
+      fromMarker.orElse {
+        val aliasTparams: IArray[TypeParamTree] =
+          scope
+            .lookup(field.tpe.typeName)
+            .collectFirst {
+              case (ta: TypeAliasTree, _) if ta.tparams.nonEmpty => ta.tparams
+            }
+            .getOrElse(Empty)
+
+        def fromJsFunction(paramTypes: IArray[TypeRef], ret: TypeRef): Option[Component] =
+          buildMethodComponent(aliasTparams, paramTypes, ret)
+
+        FollowAliases(scope)(field.tpe) match {
+          case TypeRef.JsFunction(paramTypes, ret) => fromJsFunction(paramTypes, ret)
+          case TypeRef.Intersection(types, _) =>
+            types.firstDefined {
+              case TypeRef.JsFunction(paramTypes, ret) => fromJsFunction(paramTypes, ret)
+              case _                                   => None
+            }
+          case _ => None
+        }
       }
     }
 

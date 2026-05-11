@@ -134,7 +134,8 @@ class ImportTree(
           }
         }
 
-        val anns = ImportJsLocation(jsLocation)
+        val anns          = ImportJsLocation(jsLocation)
+        val fieldComments = tpeOpt.flatMap(extractInnerFunctionMarker(scope, _)).fold(cs)(m => cs + m)
 
         /* need to reach well known symbols through a stable path */
         if (name === Name.Symbol)
@@ -160,7 +161,7 @@ class ImportTree(
               impl        = ExprTree.native,
               isReadOnly  = readOnly,
               isOverride  = false,
-              comments    = cs,
+              comments    = fieldComments,
               codePath    = importedCp,
             ),
           )
@@ -439,13 +440,17 @@ class ImportTree(
 
       case TsDeclTypeAlias(cs, _, _, tparams, alias, codePath) =>
         val importedCp = importName(codePath)
+
+        val markerComments = extractInnerFunctionMarker(scope, alias, tparams.map(_.name).toSet)
+          .fold(cs)(m => cs + m)
+
         IArray(
           TypeAliasTree(
             name     = importedCp.parts.last,
             level    = ProtectionLevel.Public,
             tparams  = tparams.map(typeParam(scope, importName)),
             alias    = importType(scope, importName)(alias),
-            comments = cs,
+            comments = markerComments,
             codePath = importedCp,
           ),
         )
@@ -698,6 +703,37 @@ class ImportTree(
         scope.logger.info(s"dropping member $name")
         Empty
     }
+
+  // Extracts the preserved (pre-inlineTParams) function signature from a TS type, storing it as a
+  // Marker so IdentifyReactComponents can generate generic builders (e.g. List[T], Segmented[T]).
+  def extractInnerFunctionMarker(
+      scope:               TsTreeScope,
+      tpe:                 TsType,
+      existingTparamNames: Set[TsIdent] = Set.empty,
+  ): Option[Marker.InnerFunctionTparams] = {
+    def fromSig(sig: TsFunSig): Option[Marker.InnerFunctionTparams] = {
+      val newTparams = sig.tparams.filterNot(tp => existingTparamNames(tp.name))
+      if (newTparams.isEmpty) None
+      else {
+        val restParams = sig.params match {
+          case IArray.headTail(first, tail) if first.name === TsIdent.`this` => tail
+          case all                                                           => all
+        }
+        Some(
+          Marker.InnerFunctionTparams(
+            tparamNames = newTparams.map(tp => ImportName(tp.name)),
+            paramTypes  = restParams.map(p => importType(scope, importName)(p.tpe.getOrElse(TsTypeRef.any))),
+            retType     = importType.orAny(scope, importName)(sig.resultType),
+          ),
+        )
+      }
+    }
+    tpe match {
+      case TsTypeFunction(sig)    => fromSig(sig)
+      case TsTypeIntersect(types) => types.firstDefined(t => extractInnerFunctionMarker(scope, t, existingTparamNames))
+      case _                      => None
+    }
+  }
 
   def hack(f: FieldTree): Option[FieldTree] =
     f.comments.extract { case Marker.ExpandedCallables => () } match {
