@@ -814,10 +814,26 @@ class ImportTree(
 
     if (name === Name.APPLY || name === Name.namespaced) ret
     else {
+      /* Don't recurse into TsTypeRef.tparams: literal type defaults filled in by DefaultedTypeArguments
+       * (e.g. ValueType = 'text' in ProListProps<R, U, 'text'>) are type-level, not value-level,
+       * and should not cause a naming suffix on the enclosing function. */
+      def collectParamLiterals(tpe: TsType): IArray[String] = tpe match {
+        case TsTypeLiteral(lit)     => IArray(lit.literal)
+        case TsTypeUnion(types)     => types.flatMap(collectParamLiterals)
+        case TsTypeIntersect(types) => types.flatMap(collectParamLiterals)
+        case _: TsTypeRef => Empty
+        case TsTypeObject(_, members) =>
+          members.flatMap {
+            case m: TsMemberProperty => m.tpe.fold(Empty: IArray[String])(collectParamLiterals)
+            case m: TsMemberFunction =>
+              m.signature.params.flatMap(_.tpe.fold(Empty: IArray[String])(collectParamLiterals))
+            case _ => Empty
+          }
+        case _ => Empty
+      }
+
       val containedLiterals: IArray[String] =
-        TsTreeTraverse.collectIArray(sig.params) {
-          case x: TsLiteral => x.literal
-        }
+        sig.params.flatMap(_.tpe.fold(Empty: IArray[String])(collectParamLiterals))
 
       containedLiterals.distinct.toList.map(_.filter(_.isLetterOrDigit)).filter(_.nonEmpty) match {
         case suffix :: Nil => ret.withSuffix(suffix)
