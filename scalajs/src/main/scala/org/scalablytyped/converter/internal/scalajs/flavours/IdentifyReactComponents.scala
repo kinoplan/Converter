@@ -347,33 +347,43 @@ class IdentifyReactComponents(
         nested        = Empty,
       ),
     )
-    def isAliasToFC: Option[Component] =
-      FollowAliases(scope)(field.tpe) match {
-        case TypeRef.JsFunction(paramTypes, ret) =>
-          val params =
-            paramTypes.map(tpe =>
-              ParamTree(Name.dummy, isImplicit = false, isVal = false, tpe, NotImplemented, NoComments),
-            )
-
-          maybeMethodComponent(
-            MethodTree(
-              annotations = field.annotations,
-              level       = ProtectionLevel.Public,
-              name        = field.name,
-              tparams     = Empty,
-              params      = IArray(params),
-              impl        = field.impl,
-              resultType  = ret,
-              isOverride  = false,
-              comments    = field.comments,
-              codePath    = field.codePath,
-              isImplicit  = false,
-            ),
-            owner,
-            scope,
+    def isAliasToFC: Option[Component] = {
+      def fromJsFunction(paramTypes: IArray[TypeRef], ret: TypeRef): Option[Component] = {
+        val params =
+          paramTypes.map(tpe =>
+            ParamTree(Name.dummy, isImplicit = false, isVal = false, tpe, NotImplemented, NoComments),
           )
+        // ReturnType<T> is a TypeScript utility type; treat as Any since we can't resolve it
+        val resultType = if (ret.typeName.parts.last.unescaped === "ReturnType") TypeRef.Any else ret
+        maybeMethodComponent(
+          MethodTree(
+            annotations = field.annotations,
+            level       = ProtectionLevel.Public,
+            name        = field.name,
+            tparams     = Empty,
+            params      = IArray(params),
+            impl        = field.impl,
+            resultType  = resultType,
+            isOverride  = false,
+            comments    = field.comments,
+            codePath    = field.codePath,
+            isImplicit  = false,
+          ),
+          owner,
+          scope,
+        )
+      }
+
+      FollowAliases(scope)(field.tpe) match {
+        case TypeRef.JsFunction(paramTypes, ret) => fromJsFunction(paramTypes, ret)
+        case TypeRef.Intersection(types, _) =>
+          types.firstDefined {
+            case TypeRef.JsFunction(paramTypes, ret) => fromJsFunction(paramTypes, ret)
+            case _                                   => None
+          }
         case _ => None
       }
+    }
 
     fieldResult.orElse(isAliasToFC)
   }
