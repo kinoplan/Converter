@@ -516,7 +516,7 @@ class JapgollyGenComponents(
             Name("companion"),
             isImplicit = false,
             isVal      = false,
-            TypeRef.Singleton(TypeRef(ownerCp.parts.last)),
+            TypeRef.Singleton(TypeRef(ownerCp)),
             NotImplemented,
             NoComments,
           )

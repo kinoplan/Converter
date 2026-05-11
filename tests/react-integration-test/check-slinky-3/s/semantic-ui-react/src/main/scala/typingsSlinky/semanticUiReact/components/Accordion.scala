@@ -26,7 +26,7 @@ object Accordion {
     
     type Props = AccordionAccordionProps
     
-    implicit def make(companion: Accordion.type): SharedBuilder_AccordionAccordionProps_2001699741[typingsSlinky.semanticUiReact.distCommonjsModulesAccordionMod.default.Accordion] = new SharedBuilder_AccordionAccordionProps_2001699741[typingsSlinky.semanticUiReact.distCommonjsModulesAccordionMod.default.Accordion](js.Array(this.component, js.Dictionary.empty))()
+    implicit def make(companion: typingsSlinky.semanticUiReact.components.Accordion.Accordion.type): SharedBuilder_AccordionAccordionProps_2001699741[typingsSlinky.semanticUiReact.distCommonjsModulesAccordionMod.default.Accordion] = new SharedBuilder_AccordionAccordionProps_2001699741[typingsSlinky.semanticUiReact.distCommonjsModulesAccordionMod.default.Accordion](js.Array(this.component, js.Dictionary.empty))()
     
     def withProps(p: AccordionAccordionProps): SharedBuilder_AccordionAccordionProps_2001699741[typingsSlinky.semanticUiReact.distCommonjsModulesAccordionMod.default.Accordion] = new SharedBuilder_AccordionAccordionProps_2001699741[typingsSlinky.semanticUiReact.distCommonjsModulesAccordionMod.default.Accordion](js.Array(this.component, p.asInstanceOf[js.Any]))
   }
@@ -95,7 +95,7 @@ object Accordion {
   
   type Props = AccordionProps
   
-  implicit def make(companion: Accordion.type): Builder = new Builder(js.Array(this.component, js.Dictionary.empty))()
+  implicit def make(companion: typingsSlinky.semanticUiReact.components.Accordion.type): Builder = new Builder(js.Array(this.component, js.Dictionary.empty))()
   
   def withProps(p: AccordionProps): Builder = new Builder(js.Array(this.component, p.asInstanceOf[js.Any]))
 }
