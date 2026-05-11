@@ -115,5 +115,5 @@ case class Versions(scala: Versions.Scala, scalaJs: Versions.ScalaJs) {
   val scalaJsDom   = Dep.ScalaJs("org.scala-js", "scalajs-dom", "2.8.1")
   val slinkyWeb    = Dep.ScalaJs("me.shadaj", "slinky-web", "0.7.5")
   val slinkyNative = Dep.ScalaJs("me.shadaj", "slinky-native", "0.7.5").for3Use2_13(scala.is3)
-  val scalajsReact = Dep.ScalaJs("com.github.japgolly.scalajs-react", "core", "2.1.3")
+  val scalajsReact = Dep.ScalaJs("com.github.japgolly.scalajs-react", "core", "3.0.0")
 }
