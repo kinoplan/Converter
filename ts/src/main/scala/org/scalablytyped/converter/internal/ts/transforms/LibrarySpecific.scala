@@ -197,8 +197,69 @@ object LibrarySpecific {
       }
   }
 
+  object i18next extends Named {
+    override val libName = TsIdentLibrarySimple("i18next")
+
+    override def enterTsDeclInterface(t: TsTreeScope)(x: TsDeclInterface): TsDeclInterface =
+      x.name match {
+        case TsIdentSimple("TFunctionSelector") =>
+          x.copy(members = x.members.filter {
+            case TsMemberCall(_, _, sig) => !isErasureConflict(sig)
+            case _                       => true
+          })
+        case _ => x
+      }
+
+    /* Two call-signature overloads in TFunctionSelector produce identical JVM-erased signatures.
+     * We drop the more-specific variant in each conflicting pair to allow compilation. */
+    private def isErasureConflict(sig: TsFunSig): Boolean =
+      sig.tparams.length match {
+        /* 4-tparam overload: Selector(s) with explicit `ns`.
+         * Its first param is a union `SelectorFn | readonly SelectorFn[]` that SplitMethods
+         * splits into two overloads — both run AFTER LibrarySpecific. After splitting, the
+         * single-SelectorFn variant erases identically to the 3-tparam context overload.
+         * Drop the entire 4-tparam overload here (before the split) to prevent the conflict. */
+        case 4 => true
+        /* 3-tparam overload with `DV extends string`: single selector with explicit defaultValue.
+         * Erases identically to the 2-tparam array-of-selectors overload. */
+        case 3 =>
+          sig.tparams.exists(_.upperBound.exists(_ == TsTypeRef.string))
+        case _ => false
+      }
+  }
+
+  object reactI18next extends Named {
+    override val libName = TsIdentLibrarySimple("react-i18next")
+
+    private val dropCallSignatures = Set[TsIdent](
+      TsIdentSimple("TransLegacy"),
+      TsIdentSimple("TransSelector"),
+      TsIdentSimple("IcuTransComponent"),
+      TsIdentSimple("IcuTransWithoutContextComponent"),
+    )
+
+    /* These interfaces have a single generic call signature with free type params (e.g. TContext)
+     * that FillInTParams fails to fully substitute transitively, leaving TContext as a free variable
+     * in the generated type alias. Dropping the call signatures prevents PreferTypeAlias from
+     * converting these interfaces to broken type aliases. */
+    override def enterTsDeclInterface(t: TsTreeScope)(x: TsDeclInterface): TsDeclInterface =
+      if (dropCallSignatures(x.name))
+        x.copy(members = x.members.filter { case _: TsMemberCall => false; case _ => true })
+      else x
+
+    /* useTranslation is typed as a conditional type (_EnableSelector extends ... ? ... : ...)
+     * which ScalablyTyped cannot resolve, producing js.Any. Replace with UseTranslationSelector,
+     * which has the necessary zero-arg apply overload for idiomatic usage. */
+    override def enterTsDeclVar(t: TsTreeScope)(x: TsDeclVar): TsDeclVar =
+      x.name match {
+        case TsIdentSimple("useTranslation") =>
+          x.copy(tpe = Some(TsTypeRef(NoComments, TsQIdent(IArray(TsIdentSimple("UseTranslationSelector"))), Empty)))
+        case _ => x
+      }
+  }
+
   val patches: Map[TsIdentLibrary, Named] =
-    IArray(aMap, node, react, semanticUiReact, std, styledComponents)
+    IArray(aMap, i18next, node, react, reactI18next, semanticUiReact, std, styledComponents)
       .map(x => x.libName -> x)
       .toMap
 
