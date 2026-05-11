@@ -1,7 +1,7 @@
 package org.scalablytyped.converter.internal
 
 import io.circe.{Decoder, Encoder}
-import org.scalablytyped.converter.internal.scalajs.{ExprTree, QualifiedName, TypeRef}
+import org.scalablytyped.converter.internal.scalajs.{ExprTree, Name, QualifiedName, TypeRef}
 import org.scalablytyped.converter.internal.ts.TsIdentModule
 
 sealed trait Comment
@@ -35,6 +35,14 @@ object Marker {
 
   case object ManglerLeaveAlone extends Marker
   case object ManglerWasJsNative extends Marker
+
+  /* Stores the original (pre-inlineTParams) function signature for type aliases whose body is a
+   * generic function type. Used by IdentifyReactComponents to generate generic component builders. */
+  case class InnerFunctionTparams(
+      tparamNames: IArray[Name],
+      paramTypes:  IArray[TypeRef],
+      retType:     TypeRef,
+  ) extends Marker
 }
 
 object Comment {
