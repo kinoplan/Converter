@@ -19,3 +19,27 @@
     <img src="https://img.shields.io/badge/scala.js-1.0.0+-red.svg?logo=scala&logoColor=red"/>
   </a>    
 </p>
+
+## Quick Start
+
+**project/plugins.sbt**
+```scala
+resolvers += "Maven Central Sonatype Snapshots".at("https://central.sonatype.com/repository/maven-snapshots")
+
+addSbtPlugin("org.scala-js"              % "sbt-scalajs"   % "1.21.0")
+addSbtPlugin("io.kinoplan.scalablytyped" % "sbt-converter" % "<version>")
+```
+
+**build.sbt**
+```scala
+project
+  .enablePlugins(ScalaJSPlugin, ScalablyTypedConverterExternalNpmPlugin)
+  .settings(
+    scalaVersion := "2.13.18",
+    stFlavour    := Flavour.ScalajsReact, // or Slinky/SlinkyNative
+    stIgnore     ++= List("typescript"),
+    externalNpm  := baseDirectory.value,
+  )
+```
+
+`externalNpm` points to the directory containing `package.json`. Run `yarn install` there before the sbt build.
