@@ -17,7 +17,10 @@
   </a>
   <a href="https://github.com/scala/scala/releases">
     <img src="https://img.shields.io/badge/scala.js-1.0.0+-red.svg?logo=scala&logoColor=red"/>
-  </a>    
+  </a>
+  <a href="https://central.sonatype.com/search?namespace=io.kinoplan.scalablytyped">
+    <img src="https://img.shields.io/maven-central/v/io.kinoplan.scalablytyped/sbt-converter_2.12_1.0.svg?label=Maven%20Central"/>
+  </a>
 </p>
 
 ## Quick Start
