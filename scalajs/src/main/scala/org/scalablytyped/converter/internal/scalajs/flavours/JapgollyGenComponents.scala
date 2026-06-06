@@ -58,9 +58,25 @@ object JapgollyGenComponents {
     )
     val MaxParamsInJavascript = 254
 
+    def propJvmWeight(prop: Prop): Int =
+      prop match {
+        case Prop.Normal(main, _, _, _, _) =>
+          main.tpe match {
+            case TypeRef.Double | TypeRef.Long => 2
+            case _                             => 1
+          }
+        case _ => 1
+      }
+
     val (propsInApply, propsInBuilder) =
       if (enableLongApplyMethod) (filteredProps.take(MaxParamsInJavascript), filteredProps.drop(MaxParamsInJavascript))
-      else filteredProps.partition(_.isRequired)
+      else {
+        val (required, optional) = filteredProps.partition(_.isRequired)
+        val requiredJvmWeight    = required.foldLeft(0)(_ + propJvmWeight(_))
+
+        if (requiredJvmWeight <= MaxParamsInJavascript) (required, optional)
+        else (Empty, filteredProps)
+      }
 
     SplitProps(refTypes, propsInApply, propsInBuilder)
   }
