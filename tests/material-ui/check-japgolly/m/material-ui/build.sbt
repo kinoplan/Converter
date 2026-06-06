@@ -4,7 +4,7 @@ version := "0.0-unknown-f24ba3"
 scalaVersion := "3.0.1"
 enablePlugins(ScalaJSPlugin)
 libraryDependencies ++= Seq(
-  "com.github.japgolly.scalajs-react" %%% "core" % "3.0.0",
+  "com.github.japgolly.scalajs-react" %%% "core" % "4.0.0",
   "com.olvind" %%% "scalablytyped-runtime" % "2.4.2",
   "org.scalablytyped" %%% "react" % "0.0-unknown-a6bd68",
   "org.scalablytyped" %%% "std" % "0.0-unknown-7bde64")
