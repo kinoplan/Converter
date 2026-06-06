@@ -183,6 +183,8 @@ class IdentifyReactComponents(
       else
         current match {
           case Optionality(opt, base) if opt =/= Optionality.No => returnsElement(scope, base)
+          // React 19: FunctionComponent returns ReactNode | Promise<ReactNode>
+          case TypeRef(QualifiedName.UNION, types, _) => types.firstDefined(returnsElement(scope, _))
           case _ =>
             scope
               .lookup(current.typeName)
